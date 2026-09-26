@@ -28,3 +28,17 @@ jobs:
         with:
           name: Artifacts
           path: build/libs/
+
+  e2e-test:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: Artifacts
+          path: build/libs/
+      - name: run Minecraft server E2E test
+        run: bash .github/scripts/e2e-test.sh
