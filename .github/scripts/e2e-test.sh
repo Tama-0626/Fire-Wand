@@ -18,6 +18,7 @@ fi
 
 mkdir -p "$mods_dir"
 cp "${mod_jars[0]}" "$mods_dir/fire-wand.jar"
+chmod -R a+rwx "$mods_dir"
 
 docker run -d \
   --name "$container_name" \
@@ -55,8 +56,26 @@ if [[ "$ready" != true ]]; then
   exit 1
 fi
 
-printf 'RCON response to list:\n'
-docker exec "$container_name" rcon-cli list
+rcon_ready=false
+for attempt in {0..20}; do
+  if rcon_response="$(docker exec "$container_name" rcon-cli list 2>&1)"; then
+    rcon_ready=true
+    break
+  fi
+
+  if [[ "$attempt" -lt 20 ]]; then
+    printf 'RCON not ready; retry %s/20 in 15 seconds.\n' "$((attempt + 1))" >&2
+    sleep 15
+  fi
+done
+
+if [[ "$rcon_ready" != true ]]; then
+  printf 'RCON did not respond after the initial attempt and 20 retries. Last response: %s\n' "$rcon_response" >&2
+  docker logs "$container_name" >&2 || true
+  exit 1
+fi
+
+printf 'RCON response to list:\n%s\n' "$rcon_response"
 
 server_logs="$(docker logs "$container_name" 2>&1 || true)"
 if grep -Eiq '(^|[[:space:]/])(ERROR|FATAL)([[:space:]:\]]|$)|Exception in server tick loop|Crash report|Failed to start' <<<"$server_logs"; then
